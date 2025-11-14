@@ -9,6 +9,9 @@ package model;
  * @author danie
  */
 public interface IGameFunction {
+    public void iniciar();
+    public Stat getStats();
+    void setGameListener(IGameListener listener);
 
     
 }  
