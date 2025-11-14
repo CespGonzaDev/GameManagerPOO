@@ -3,10 +3,8 @@
  * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
  */
  
-import model.IGameFunction;
- 
 package games.clicker;
-
+import model.IGameFunction;
 /**
  *
  * @author danie
