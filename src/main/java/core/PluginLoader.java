@@ -1,8 +1,5 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package core;
+
 import model.IGameFunction;
 
 import java.io.File;
@@ -13,9 +10,8 @@ import java.util.List;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.Enumeration;
+
 /**
- *
- * @author danie
  * Gestor de carga dinámica de juegos desde archivos JAR externos.
  * Busca archivos JAR en un directorio específico, carga las clases que implementan
  * IGameFunction y las retorna para integración con el sistema.
@@ -81,37 +77,42 @@ public class PluginLoader {
         URL jarUrl = archivoJar.toURI().toURL();
         URLClassLoader classLoader = new URLClassLoader(new URL[]{jarUrl}, getClass().getClassLoader());
 
-        // Abrir el archivo JAR y explorar sus entradas
-        try (JarFile jarFile = new JarFile(archivoJar)) {
-            Enumeration<JarEntry> entries = jarFile.entries();
+        try {
+            // Abrir el archivo JAR y explorar sus entradas
+            try (JarFile jarFile = new JarFile(archivoJar)) {
+                Enumeration<JarEntry> entries = jarFile.entries();
 
-            while (entries.hasMoreElements()) {
-                JarEntry entry = entries.nextElement();
-                String nombreEntrada = entry.getName();
+                while (entries.hasMoreElements()) {
+                    JarEntry entry = entries.nextElement();
+                    String nombreEntrada = entry.getName();
 
-                // Filtrar solo archivos .class
-                if (nombreEntrada.endsWith(".class")) {
-                    // Convertir ruta a nombre de clase: com/ejemplo/Juego.class -> com.ejemplo.Juego
-                    String nombreClase = nombreEntrada.replace('/', '.').replace(".class", "");
+                    // Filtrar solo archivos .class
+                    if (nombreEntrada.endsWith(".class")) {
+                        // Convertir ruta a nombre de clase
+                        String nombreClase = nombreEntrada.replace('/', '.').replace(".class", "");
 
-                    try {
-                        // Cargar la clase
-                        Class<?> clase = classLoader.loadClass(nombreClase);
+                        try {
+                            // Cargar la clase
+                            Class<?> clase = classLoader.loadClass(nombreClase);
 
-                        // Verificar si implementa IGameFunction
-                        if (IGameFunction.class.isAssignableFrom(clase) && !clase.isInterface()) {
-                            // Instanciar el juego usando el método getInstance si existe (patrón Singleton)
-                            IGameFunction instancia = instanciarJuego(clase);
-                            if (instancia != null) {
-                                juegos.add(instancia);
-                                System.out.println("Plugin cargado exitosamente: " + nombreClase);
+                            // Verificar si implementa IGameFunction
+                            if (IGameFunction.class.isAssignableFrom(clase) && !clase.isInterface()) {
+                                // Instanciar el juego
+                                IGameFunction instancia = instanciarJuego(clase);
+                                if (instancia != null) {
+                                    juegos.add(instancia);
+                                    System.out.println("Plugin cargado exitosamente: " + nombreClase);
+                                }
                             }
+                        } catch (ClassNotFoundException | NoClassDefFoundError e) {
+                            // Ignorar clases que no se pueden cargar
                         }
-                    } catch (ClassNotFoundException | NoClassDefFoundError e) {
-                        // Ignorar clases que no se pueden cargar (dependencias faltantes, etc.)
                     }
                 }
             }
+        } finally {
+            // Cerrar el classLoader para evitar resource leak
+            classLoader.close();
         }
 
         return juegos;
@@ -157,4 +158,3 @@ public class PluginLoader {
         this.pluginsDir = pluginsDir;
     }
 }
-
