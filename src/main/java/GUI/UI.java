@@ -1,33 +1,26 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package GUI;
 
-/**
- *
- * @author danie
- */
-
-
-import games.clicker.ClickerGame;
-import games.dice.Dice;
-import games.tictactoe.Tictactoe;
+import core.GameManager;
+import model.IGameFunction;
 import model.IGameListener;
 import model.Stat;
 import records.RecordsManager;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Interfaz gráfica principal del gestor de juegos.
- * Muestra menú para lanzar juegos, consulta de records y gestiona las ventanas internas.
+ * Carga dinámicamente todos los juegos disponibles (internos y externos).
  */
 public class UI extends JFrame {
     private JDesktopPane desktopPane;
     private RecordsManager recordsManager;
+    private GameManager gameManager;
+    private Map<String, IGameFunction> juegosMap;
 
     public UI() {
         super("Gestor de Juegos");
@@ -35,6 +28,9 @@ public class UI extends JFrame {
         setSize(800, 600);
 
         recordsManager = new RecordsManager();
+        gameManager = GameManager.getInstance();
+        juegosMap = new HashMap<>();
+
         desktopPane = new JDesktopPane();
         setContentPane(desktopPane);
 
@@ -42,16 +38,12 @@ public class UI extends JFrame {
         JMenuBar menuBar = new JMenuBar();
         setJMenuBar(menuBar);
 
-        // Menú Juegos
+        // Menú Juegos - DINÁMICO
         JMenu menuJuegos = new JMenu("Juegos");
         menuBar.add(menuJuegos);
 
-        JMenuItem juegoClicker = new JMenuItem("Clicker");
-        JMenuItem juegoDado = new JMenuItem("Dado");
-        JMenuItem juegoTicTacToe = new JMenuItem("Tres en Raya");
-        menuJuegos.add(juegoClicker);
-        menuJuegos.add(juegoDado);
-        menuJuegos.add(juegoTicTacToe);
+        // Cargar juegos dinámicamente desde GameManager
+        cargarJuegosDinamicamente(menuJuegos);
 
         // Menú Records
         JMenu menuRecords = new JMenu("Records");
@@ -59,41 +51,80 @@ public class UI extends JFrame {
 
         JMenuItem verRecords = new JMenuItem("Ver records");
         menuRecords.add(verRecords);
-
-        // Acciones para lanzar juegos
-        juegoClicker.addActionListener(e -> lanzarJuego("Clicker", ClickerGame.getInstance()));
-        juegoDado.addActionListener(e -> lanzarJuego("Dado", Dice.getInstance()));
-        juegoTicTacToe.addActionListener(e -> lanzarJuego("Tres en Raya", Tictactoe.getInstance()));
-
-        // Acción para mostrar records
         verRecords.addActionListener(e -> mostrarRecords());
+
+        // Opción para recargar plugins
+        JMenu menuOpciones = new JMenu("Opciones");
+        menuBar.add(menuOpciones);
+        
+        JMenuItem recargarPlugins = new JMenuItem("Recargar plugins externos");
+        menuOpciones.add(recargarPlugins);
+        recargarPlugins.addActionListener(e -> {
+            gameManager.recargarPlugins();
+            menuJuegos.removeAll();
+            cargarJuegosDinamicamente(menuJuegos);
+            JOptionPane.showMessageDialog(this, "Plugins recargados correctamente");
+        });
 
         setVisible(true);
     }
 
     /**
-     * Lanza un juego en un JInternalFrame.
-     *
-     * @param nombre Nombre del juego.
-     * @param juego  Instancia que implementa IGameFunction.
+     * Carga todos los juegos disponibles desde GameManager y los agrega al menú.
      */
-    private void lanzarJuego(String nombre, model.IGameFunction juego) {
+    private void cargarJuegosDinamicamente(JMenu menuJuegos) {
+        List<IGameFunction> juegosDisponibles = gameManager.getJuegosDisponibles();
+        
+        for (IGameFunction juego : juegosDisponibles) {
+            String nombreJuego = obtenerNombreJuego(juego);
+            juegosMap.put(nombreJuego, juego);
+            
+            JMenuItem itemJuego = new JMenuItem(nombreJuego);
+            itemJuego.addActionListener(e -> lanzarJuego(nombreJuego, juego));
+            menuJuegos.add(itemJuego);
+        }
+        
+        System.out.println("Juegos cargados en el menú: " + juegosDisponibles.size());
+    }
+
+    /**
+     * Obtiene el nombre del juego desde su clase.
+     */
+    private String obtenerNombreJuego(IGameFunction juego) {
+        String nombreCompleto = juego.getClass().getSimpleName();
+        
+        // Mapeo de nombres conocidos
+        switch (nombreCompleto) {
+            case "ClickerGame": return "Clicker";
+            case "Dice": return "Dado";
+            case "Tictactoe": return "Tres en Raya";
+            default: return nombreCompleto;
+        }
+    }
+
+    /**
+     * Lanza un juego en un JInternalFrame.
+     */
+    private void lanzarJuego(String nombre, IGameFunction juego) {
         JInternalFrame frame = new JInternalFrame(nombre, true, true, true, true);
         frame.setSize(400, 300);
         frame.setLayout(new BorderLayout());
-        JLabel status = new JLabel("Jugando: " + nombre);
-        frame.add(status, BorderLayout.SOUTH);
+        
+        JLabel status = new JLabel("Jugando: " + nombre, SwingConstants.CENTER);
+        status.setFont(new Font("Arial", Font.BOLD, 14));
+        frame.add(status, BorderLayout.NORTH);
 
-        // Integrar el listener para guardar el resultado al terminar la partida
+        // Integrar el listener para guardar el resultado
         juego.setGameListener(new IGameListener() {
             @Override
             public void onGameFinished(Stat stats) {
                 recordsManager.registrarRecord(nombre, stats);
                 status.setText("Partida finalizada. Resultado: " + stats.getValor());
+                System.out.println("Record registrado para " + nombre + ": " + stats.getValor());
             }
         });
 
-        // Iniciar el juego (la lógica de cada juego abre su propia ventana gráfica)
+        // Iniciar el juego
         juego.iniciar();
 
         desktopPane.add(frame);
@@ -101,21 +132,23 @@ public class UI extends JFrame {
     }
 
     /**
-     * Muestra los records en un JInternalFrame utilizando una JTable.
+     * Muestra los records en un JInternalFrame con JTable.
      */
     private void mostrarRecords() {
         JInternalFrame frame = new JInternalFrame("Records", true, true, true, true);
-        frame.setSize(450, 300);
+        frame.setSize(500, 350);
 
-        String[] nombresJuegos = {"Clicker", "Dado", "Tres en Raya"};
         String[] columnas = {"Juego", "Clave", "Nombre", "Valor"};
-        Object[][] datos = new Object[9][4];
+        
+        // Calcular cuántas filas necesitamos (máximo 3 records por juego)
+        int totalJuegos = juegosMap.size();
+        Object[][] datos = new Object[totalJuegos * 3][4];
         int index = 0;
 
-        for (String nombre : nombresJuegos) {
-            List<Stat> records = recordsManager.getMejoresRecords(nombre);
+        for (String nombreJuego : juegosMap.keySet()) {
+            List<Stat> records = recordsManager.getMejoresRecords(nombreJuego);
             for (Stat stat : records) {
-                datos[index][0] = nombre;
+                datos[index][0] = nombreJuego;
                 datos[index][1] = stat.getClave();
                 datos[index][2] = stat.getNombre();
                 datos[index][3] = stat.getValor();
@@ -124,7 +157,11 @@ public class UI extends JFrame {
         }
 
         JTable table = new JTable(datos, columnas);
-        frame.add(new JScrollPane(table));
+        table.setFillsViewportHeight(true);
+        
+        JScrollPane scrollPane = new JScrollPane(table);
+        frame.add(scrollPane);
+        
         desktopPane.add(frame);
         frame.setVisible(true);
     }
