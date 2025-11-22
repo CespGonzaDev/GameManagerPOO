@@ -1,2 +1,3 @@
-aciertos|Aciertos en 5 tiradas|2
+puntos|Puntos totales|9
+aciertos|Aciertos en 5 tiradas|3
 aciertos|Aciertos en 5 tiradas|2
