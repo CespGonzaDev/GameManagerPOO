@@ -43,7 +43,43 @@ public class UI extends JFrame {
         add(panelSuperior, BorderLayout.NORTH);
 
         setVisible(true);
+        // MÉTODO TEMPORAL DE PRUEBA - Eliminar después de las pruebas
+        probarJuegoExterno();
     }
+    // MÉTODO TEMPORAL DE PRUEBA - Agregar después del constructor
+    private void probarJuegoExterno() {
+        System.out.println("\n=== PRUEBA DE JUEGO EXTERNO ===");
+        
+        for (Map.Entry<String, IGameFunction> entrada : juegosMap.entrySet()) {
+            String nombre = entrada.getKey();
+            IGameFunction juego = entrada.getValue();
+            
+            // Verificar si es externo
+            if (core.PluginLoader.getNombreOriginal(juego) != null) {
+                System.out.println("\nProbando juego externo: " + nombre);
+                System.out.println("  - Clase: " + juego.getClass().getName());
+                
+                try {
+                    // Probar getStats
+                    Stat stats = juego.getStats();
+                    System.out.println("  - getStats() funciona: " + stats.getClave());
+                    
+                    // Probar setGameListener
+                    juego.setGameListener(stat -> {
+                        System.out.println("  - Listener funciona correctamente");
+                    });
+                    System.out.println("  - setGameListener() funciona");
+                    
+                } catch (Exception e) {
+                    System.err.println("  - ERROR: " + e.getMessage());
+                    e.printStackTrace();
+                }
+            }
+        }
+        
+        System.out.println("\n=== FIN DE PRUEBA ===\n");
+    }
+
 
     private JPanel crearPanelSuperior() {
         JPanel panel = new JPanel(new BorderLayout());
@@ -132,7 +168,18 @@ public class UI extends JFrame {
         List<IGameFunction> juegosDisponibles = gameManager.getJuegosDisponibles();
 
         for (IGameFunction juego : juegosDisponibles) {
+            if (juego == null) {
+                System.err.println("Juego nulo detectado, omitiendo...");
+                continue;
+            }
+
             String nombreJuego = obtenerNombreJuego(juego);
+            
+            if (nombreJuego == null || nombreJuego.trim().isEmpty()) {
+                System.err.println("Juego sin nombre detectado: " + juego.getClass().getName());
+                continue;
+            }
+
             juegosMap.put(nombreJuego, juego);
 
             JButton btnJuego = crearBotonJuego(nombreJuego);
@@ -144,6 +191,8 @@ public class UI extends JFrame {
 
         panelJuegos.revalidate();
         panelJuegos.repaint();
+        
+        System.out.println("Juegos cargados en UI: " + juegosMap.size());
     }
 
     private JButton crearBotonJuego(String texto) {
@@ -170,6 +219,13 @@ public class UI extends JFrame {
     }
 
     private String obtenerNombreJuego(IGameFunction juego) {
+        // Primero intentar obtener el nombre del PluginLoader (juegos externos)
+        String nombreOriginal = core.PluginLoader.getNombreOriginal(juego);
+        if (nombreOriginal != null && !nombreOriginal.isEmpty()) {
+            return nombreOriginal;
+        }
+        
+        // Si es juego interno, usar switch normal
         String nombreCompleto = juego.getClass().getSimpleName();
         switch (nombreCompleto) {
             case "ClickerGame": return "Clicker";
@@ -179,43 +235,79 @@ public class UI extends JFrame {
         }
     }
 
+    /**
+     * Lanza un juego en su propia ventana independiente.
+     * Funciona tanto para juegos internos como externos.
+     */
+
     private void lanzarJuego(String nombre, IGameFunction juego) {
-        JInternalFrame frame = new JInternalFrame(nombre, true, true, true, true);
-        frame.setSize(450, 350);
-        frame.setLayout(new BorderLayout());
-
-        JPanel panelEstado = new JPanel();
-        panelEstado.setBackground(new Color(236, 240, 241));
-        panelEstado.setBorder(new EmptyBorder(10, 10, 10, 10));
+        System.out.println("=== Lanzando juego: " + nombre + " ===");
         
-        JLabel status = new JLabel("Jugando: " + nombre, SwingConstants.CENTER);
-        status.setFont(new Font("Arial", Font.BOLD, 14));
-        status.setForeground(new Color(44, 62, 80));
-        panelEstado.add(status);
-
-        frame.add(panelEstado, BorderLayout.SOUTH);
-
-        juego.setGameListener(new IGameListener() {
-            @Override
-            public void onGameFinished(Stat stats) {
-                recordsManager.registrarRecord(nombre, stats);
-                status.setText("Partida finalizada - Puntos: " + stats.getValor());
+        // Verificar si es un juego externo
+        boolean esJuegoExterno = core.PluginLoader.getNombreOriginal(juego) != null;
+        
+        if (esJuegoExterno) {
+            // Para juegos externos: mostrar mensaje informativo
+            int opcion = JOptionPane.showConfirmDialog(
+                this,
+                "Los juegos externos del JAR tienen limitaciones de compatibilidad.\n\n" +
+                "El juego '" + nombre + "' puede no funcionar correctamente debido a\n" +
+                "restricciones de diseño (Singleton, ventanas ya creadas, etc.).\n\n" +
+                "¿Deseas intentar ejecutarlo de todos modos?",
+                "Advertencia - Juego Externo",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE
+            );
+            
+            if (opcion != JOptionPane.YES_OPTION) {
+                return;
             }
-        });
-
-        juego.iniciar();
-
-        frame.setLocation(30, 30);
-        desktopPane.add(frame);
-        frame.setVisible(true);
+        }
         
         try {
-            frame.setSelected(true);
-        } catch (java.beans.PropertyVetoException e) {
+            juego.setGameListener(new IGameListener() {
+                @Override
+                public void onGameFinished(Stat stats) {
+                    System.out.println("Juego finalizado: " + nombre + " - Puntos: " + stats.getValor());
+                    recordsManager.registrarRecord(nombre, stats);
+                    
+                    SwingUtilities.invokeLater(() -> {
+                        String mensaje = String.format(
+                            "Partida finalizada\n\nJuego: %s\nPuntos: %d\n\nRecord guardado correctamente",
+                            nombre, stats.getValor()
+                        );
+                        JOptionPane.showMessageDialog(
+                            UI.this,
+                            mensaje,
+                            "Resultado guardado",
+                            JOptionPane.INFORMATION_MESSAGE
+                        );
+                    });
+                }
+            });
+            
+            System.out.println("Listener configurado, iniciando juego...");
+            juego.iniciar();
+            System.out.println("Comando iniciar() ejecutado");
+            
+        } catch (Exception e) {
+            System.err.println("ERROR CRÍTICO al lanzar juego " + nombre);
             e.printStackTrace();
+            
+            JOptionPane.showMessageDialog(
+                this,
+                "Error al iniciar el juego " + nombre + ":\n\n" + e.getMessage(),
+                "Error",
+                JOptionPane.ERROR_MESSAGE
+            );
         }
     }
 
+
+
+    /**
+     * Muestra los records en un JInternalFrame con JTable.
+     */
     private void mostrarRecords() {
         JInternalFrame frame = new JInternalFrame("Records y Estadisticas", true, true, true, true);
         frame.setSize(650, 400);

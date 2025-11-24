@@ -1,0 +1,2 @@
+puntos|Puntos totales|4
+puntos|Puntos totales|0

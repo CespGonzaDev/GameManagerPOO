@@ -50,6 +50,7 @@ public class RecordsManager {
      * @param stat        Estadística del resultado obtenido.
      */
     public void registrarRecord(String nombreJuego, Stat stat) {
+        System.out.println("DEBUG: Registrando record para juego: '" + nombreJuego + "'");
         // Obtener lista actual de records para este juego
         List<Stat> records = recordsPorJuego.getOrDefault(nombreJuego, new ArrayList<>());
 

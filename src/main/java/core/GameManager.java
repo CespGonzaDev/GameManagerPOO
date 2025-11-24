@@ -86,26 +86,26 @@ public class GameManager {
      * Útil si se agregan nuevos JARs sin reiniciar la aplicación.
      */
     public void recargarPlugins() {
-        List<IGameFunction> pluginsExternos = pluginLoader.cargarPlugins();
-        
-        // Remover plugins antiguos y agregar los nuevos
+        // Remover SOLO los juegos externos (no los internos)
         juegosDisponibles.removeIf(juego -> !esJuegoInterno(juego));
+        
+        // Cargar nuevamente los plugins
+        List<IGameFunction> pluginsExternos = pluginLoader.cargarPlugins();
         juegosDisponibles.addAll(pluginsExternos);
         
-        System.out.println("Plugins recargados. Total de juegos disponibles: " + juegosDisponibles.size());
+        System.out.println("Plugins recargados. Total de juegos: " + juegosDisponibles.size());
     }
 
-    /**
-     * Verifica si un juego es interno (parte del sistema base).
-     *
-     * @param juego Juego a verificar.
-     * @return true si es juego interno, false si es externo.
-     */
     private boolean esJuegoInterno(IGameFunction juego) {
-        return juego instanceof ClickerGame || 
-               juego instanceof Dice || 
-               juego instanceof Tictactoe;
+        String nombreClase = juego.getClass().getName();
+        // Verificar si pertenece a los paquetes internos del proyecto
+        return nombreClase.startsWith("games.clicker") || 
+            nombreClase.startsWith("games.dice") || 
+            nombreClase.startsWith("games.tictactoe");
     }
+
+
+    
 
     /**
      * Obtiene la cantidad total de juegos disponibles.
